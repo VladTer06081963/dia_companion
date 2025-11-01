@@ -116,7 +116,7 @@ const App: React.FC = () => {
   const TabButton: React.FC<{tab: Tab; label: string}> = ({ tab, label }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`px-4 py-2 text-sm md:text-base font-medium rounded-md transition-colors duration-200 ${
+      className={`px-4 py-2 text-sm md:text-base font-medium rounded-md transition-colors duration-200 text-center ${
         activeTab === tab 
           ? 'bg-blue-600 text-white shadow-md' 
           : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
@@ -129,11 +129,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans">
       <header className="bg-white dark:bg-slate-800 shadow-md sticky top-0 z-10">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
           <h1 className="text-xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
             DiaCompanion
           </h1>
-          <nav className="flex space-x-2 md:space-x-4">
+          <nav className="grid grid-cols-2 gap-2 w-full max-w-md md:w-auto md:flex md:space-x-4">
             <TabButton tab={Tab.Diary} label="Дневник" />
             <TabButton tab={Tab.Analytics} label="Аналитика" />
             <TabButton tab={Tab.Chat} label="Чат-ассистент" />
