@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getChatResponse } from '../services/geminiService';
 import { addArchivedChat } from '../services/dbService';
-import { ChatMessage } from '../types';
-import { Send, User, Bot, Loader2, Save } from 'lucide-react';
+import { ChatMessage, User } from '../types';
+import { Send, User as UserIcon, Bot, Loader2, Save } from 'lucide-react';
+
+interface ChatbotProps {
+    user: User;
+}
 
 const initialMessage: ChatMessage = { 
     role: 'model', 
     text: 'Здравствуйте! Я ваш AI-ассистент по вопросам диабета. Чем могу помочь? Вы можете задать вопросы о питании, физических нагрузках или общие вопросы о диабете.' 
 };
 
-const Chatbot: React.FC = () => {
+const Chatbot: React.FC<ChatbotProps> = ({ user }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,10 +58,9 @@ const Chatbot: React.FC = () => {
     }
     try {
         await addArchivedChat({
-            id: Date.now().toString(),
             datetime: new Date().toISOString(),
             messages,
-        });
+        }, user.email);
         alert('Чат сохранен в архив.');
         setMessages([initialMessage]);
     } catch (error) {
@@ -87,7 +90,7 @@ const Chatbot: React.FC = () => {
             <div className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'}`}>
               <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }}/>
             </div>
-            {msg.role === 'user' && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center text-white"><User size={20} /></div>}
+            {msg.role === 'user' && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center text-white"><UserIcon size={20} /></div>}
           </div>
         ))}
         {isLoading && (

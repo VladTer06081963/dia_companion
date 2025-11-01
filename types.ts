@@ -21,6 +21,7 @@ export interface ChatMessage {
 
 export interface LabResult {
   id: string;
+  userEmail: string;
   datetime: string;
   type: 'blood' | 'urine' | 'other';
   fileName: string;
@@ -30,6 +31,7 @@ export interface LabResult {
 
 export interface ArchivedAnalysis {
     id: string;
+    userEmail: string;
     datetime: string;
     analysis: {
         text: string;
@@ -39,14 +41,22 @@ export interface ArchivedAnalysis {
 
 export interface ArchivedChat {
     id: string;
+    userEmail: string;
     datetime: string;
     messages: ChatMessage[];
 }
 
 export interface ArchivedRecordEdit {
   id: string; // Unique ID for the edit itself
+  userEmail: string;
   datetime: string; // When the edit was made
   recordId: string; // ID of the original record
   originalRecord: HealthRecord;
   updatedRecord: HealthRecord;
+}
+
+export interface User {
+  email: string;
+  // In a real app, this would be a hashed password
+  password: string;
 }

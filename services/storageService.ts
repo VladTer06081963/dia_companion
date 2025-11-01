@@ -1,20 +1,22 @@
 
 import { HealthRecord } from '../types';
 
-const STORAGE_KEY = 'diaCompanionRecords';
+const getStorageKey = (userEmail: string) => `diaCompanionRecords_${userEmail}`;
 
-export const saveRecords = (records: HealthRecord[]): void => {
+export const saveRecords = (records: HealthRecord[], userEmail: string): void => {
+  if (!userEmail) return;
   try {
     const serializedState = JSON.stringify(records);
-    localStorage.setItem(STORAGE_KEY, serializedState);
+    localStorage.setItem(getStorageKey(userEmail), serializedState);
   } catch (error) {
     console.error("Could not save records to local storage", error);
   }
 };
 
-export const loadRecords = (): HealthRecord[] => {
+export const loadRecords = (userEmail: string): HealthRecord[] => {
+  if (!userEmail) return [];
   try {
-    const serializedState = localStorage.getItem(STORAGE_KEY);
+    const serializedState = localStorage.getItem(getStorageKey(userEmail));
     if (serializedState === null) {
       return [];
     }

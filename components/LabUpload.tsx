@@ -1,10 +1,13 @@
 
+
 import React, { useState } from 'react';
 import { LabResult } from '../types';
 import { Upload } from 'lucide-react';
 
 interface LabUploadProps {
-  onAddLabResult: (result: Omit<LabResult, 'id'>) => void;
+  // FIX: Changed type to Omit<LabResult, 'id' | 'userEmail'> to match parent component's handler signature.
+  // The parent component is responsible for adding the userEmail.
+  onAddLabResult: (result: Omit<LabResult, 'id' | 'userEmail'>) => void;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB

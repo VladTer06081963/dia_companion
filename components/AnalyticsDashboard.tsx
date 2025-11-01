@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { HealthRecord, LabResult } from '../types';
+import { HealthRecord, LabResult, User } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { analyzeHealthDataWithSearch, playAudio, getTextToSpeech } from '../services/geminiService';
 import { addArchivedAnalysis } from '../services/dbService';
@@ -9,9 +9,10 @@ import { Loader2, Volume2, FileText } from 'lucide-react';
 interface AnalyticsDashboardProps {
   records: HealthRecord[];
   labResults: LabResult[];
+  user: User;
 }
 
-const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records, labResults }) => {
+const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records, labResults, user }) => {
   const [analysis, setAnalysis] = useState<{text: string; sources: any[]}|null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -37,10 +38,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records, labRes
       setAnalysis(result);
       // Automatically archive the analysis
       await addArchivedAnalysis({
-        id: Date.now().toString(),
         datetime: new Date().toISOString(),
         analysis: result,
-      });
+      }, user.email);
       alert('Анализ сгенерирован и сохранен в архив.');
     } catch (error) {
       console.error("Analysis failed:", error);

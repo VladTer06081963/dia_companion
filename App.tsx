@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { HealthRecord, LabResult, Tab } from './types';
+import { HealthRecord, LabResult, Tab, User } from './types';
 import { loadRecords, saveRecords } from './services/storageService';
 import { initDB, getLabResults, addLabResult, deleteLabResult, addArchivedRecordEdit } from './services/dbService';
 import HealthForm from './components/HealthForm';
@@ -10,8 +10,11 @@ import LabUpload from './components/LabUpload';
 import LabResultsList from './components/LabResultsList';
 import Archive from './components/Archive';
 import EditRecordModal from './components/EditRecordModal';
+import Auth from './components/Auth';
+import { LogOut } from 'lucide-react';
 
 const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [labResults, setLabResults] = useState<LabResult[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Diary);
@@ -20,25 +23,53 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initialize = async () => {
-      setRecords(loadRecords());
       const isDbReady = await initDB();
-      if (isDbReady) {
-        setDbReady(true);
-        const results = await getLabResults();
-        setLabResults(results);
+      setDbReady(isDbReady);
+      const loggedInUser = sessionStorage.getItem('diaCompanionUser');
+      if (loggedInUser) {
+          setCurrentUser(JSON.parse(loggedInUser));
       }
     };
     initialize();
   }, []);
 
+  const loadUserData = useCallback(async (email: string) => {
+    setRecords(loadRecords(email));
+    if (dbReady) {
+      const results = await getLabResults(email);
+      setLabResults(results);
+    }
+  }, [dbReady]);
+
+  useEffect(() => {
+    if (currentUser && dbReady) {
+      loadUserData(currentUser.email);
+    } else {
+      setRecords([]);
+      setLabResults([]);
+    }
+  }, [currentUser, dbReady, loadUserData]);
+
+  const handleAuthSuccess = (user: User) => {
+    sessionStorage.setItem('diaCompanionUser', JSON.stringify(user));
+    setCurrentUser(user);
+    setActiveTab(Tab.Diary);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('diaCompanionUser');
+    setCurrentUser(null);
+  };
+
   const handleAddRecord = useCallback((record: Omit<HealthRecord, 'id'>) => {
+    if (!currentUser) return;
     setRecords(prevRecords => {
       const newRecord: HealthRecord = { ...record, id: Date.now().toString() };
       const updatedRecords = [newRecord, ...prevRecords].sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
-      saveRecords(updatedRecords);
+      saveRecords(updatedRecords, currentUser.email);
       return updatedRecords;
     });
-  }, []);
+  }, [currentUser]);
   
   const handleEditRecord = useCallback((id: string) => {
     const recordToEdit = records.find(r => r.id === id);
@@ -48,47 +79,43 @@ const App: React.FC = () => {
   }, [records]);
 
   const handleUpdateRecord = useCallback(async (updatedRecord: HealthRecord) => {
+    if (!currentUser) return;
     const originalRecord = records.find(r => r.id === updatedRecord.id);
     if (!originalRecord) return;
 
-    // Archive the change
     await addArchivedRecordEdit({
-      id: Date.now().toString(),
       datetime: new Date().toISOString(),
       recordId: originalRecord.id,
       originalRecord,
       updatedRecord,
-    });
+    }, currentUser.email);
 
     setRecords(prevRecords => {
       const updatedRecords = prevRecords.map(r => r.id === updatedRecord.id ? updatedRecord : r)
         .sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
-      saveRecords(updatedRecords);
+      saveRecords(updatedRecords, currentUser.email);
       return updatedRecords;
     });
-
     setEditingRecord(null);
-  }, [records]);
+  }, [records, currentUser]);
 
 
   const handleDeleteRecord = useCallback((id: string) => {
+    if (!currentUser) return;
     setRecords(prevRecords => {
       const updatedRecords = prevRecords.filter(record => record.id !== id);
-      saveRecords(updatedRecords);
+      saveRecords(updatedRecords, currentUser.email);
       return updatedRecords;
     });
-  }, []);
+  }, [currentUser]);
 
   const handleImportRecords = useCallback((importedRecords: Omit<HealthRecord, 'id'>[]) => {
+    if (!currentUser) return;
     setRecords(prevRecords => {
       const existingDatetimes = new Set(prevRecords.map(r => r.datetime));
-      
       const newRecords = importedRecords
         .filter(ir => !existingDatetimes.has(ir.datetime))
-        .map((ir, index) => ({
-          ...ir,
-          id: `${new Date(ir.datetime).getTime()}-${index}`
-        }));
+        .map((ir, index) => ({ ...ir, id: `${new Date(ir.datetime).getTime()}-${index}`}));
 
       if (newRecords.length === 0) {
           alert('Нет новых записей для импорта. Возможно, все записи в файле уже существуют в дневнике.');
@@ -98,27 +125,26 @@ const App: React.FC = () => {
       const updatedRecords = [...newRecords, ...prevRecords]
         .sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
       
-      saveRecords(updatedRecords);
+      saveRecords(updatedRecords, currentUser.email);
       alert(`Успешно импортировано ${newRecords.length} записей.`);
       return updatedRecords;
     });
-  }, []);
+  }, [currentUser]);
 
-  const handleAddLabResult = useCallback(async (result: Omit<LabResult, 'id'>) => {
-    if (!dbReady) return;
-    const newResult: LabResult = { ...result, id: Date.now().toString() };
-    await addLabResult(newResult);
-    const updatedResults = await getLabResults();
+  const handleAddLabResult = useCallback(async (result: Omit<LabResult, 'id' | 'userEmail'>) => {
+    if (!dbReady || !currentUser) return;
+    await addLabResult(result, currentUser.email);
+    const updatedResults = await getLabResults(currentUser.email);
     setLabResults(updatedResults);
     alert('Анализ успешно загружен.');
-  }, [dbReady]);
+  }, [dbReady, currentUser]);
 
   const handleDeleteLabResult = useCallback(async (id: string) => {
-    if (!dbReady) return;
+    if (!dbReady || !currentUser) return;
     await deleteLabResult(id);
-    const updatedResults = await getLabResults();
+    const updatedResults = await getLabResults(currentUser.email);
     setLabResults(updatedResults);
-  }, [dbReady]);
+  }, [dbReady, currentUser]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -136,11 +162,11 @@ const App: React.FC = () => {
           </div>
         );
       case Tab.Analytics:
-        return <AnalyticsDashboard records={records} labResults={labResults} />;
+        return <AnalyticsDashboard records={records} labResults={labResults} user={currentUser!} />;
       case Tab.Chat:
-        return <Chatbot />;
+        return <Chatbot user={currentUser!} />;
       case Tab.Archive:
-        return <Archive />;
+        return <Archive user={currentUser!} />;
       default:
         return null;
     }
@@ -159,6 +185,14 @@ const App: React.FC = () => {
     </button>
   );
 
+  if (!dbReady) {
+    return <div className="min-h-screen flex items-center justify-center">Загрузка базы данных...</div>;
+  }
+  
+  if (!currentUser) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans">
       <header className="bg-white dark:bg-slate-800 shadow-md sticky top-0 z-10">
@@ -172,6 +206,12 @@ const App: React.FC = () => {
             <TabButton tab={Tab.Chat} label="Чат-ассистент" />
             <TabButton tab={Tab.Archive} label="Архив" />
           </nav>
+           <div className="flex items-center space-x-2">
+            <span className="text-sm text-slate-500 dark:text-slate-400 hidden lg:block">{currentUser.email}</span>
+            <button onClick={handleLogout} className="p-2 rounded-md bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors" aria-label="Выйти">
+                <LogOut size={18} />
+            </button>
+           </div>
         </div>
       </header>
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">

@@ -1,24 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArchivedAnalysis, ArchivedChat, ArchivedRecordEdit, HealthRecord } from '../types';
+import { ArchivedAnalysis, ArchivedChat, ArchivedRecordEdit, HealthRecord, User } from '../types';
 import { getArchivedAnalyses, deleteArchivedAnalysis, getArchivedChats, deleteArchivedChat, getArchivedRecordEdits, deleteArchivedRecordEdit } from '../services/dbService';
-import { ChevronDown, ChevronUp, Trash2, Bot, User, FileText, MessageSquare, History } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Bot, User as UserIcon, FileText, MessageSquare, History } from 'lucide-react';
 
-const Archive: React.FC = () => {
+interface ArchiveProps {
+    user: User;
+}
+
+const Archive: React.FC<ArchiveProps> = ({ user }) => {
     const [analyses, setAnalyses] = useState<ArchivedAnalysis[]>([]);
     const [chats, setChats] = useState<ArchivedChat[]>([]);
     const [edits, setEdits] = useState<ArchivedRecordEdit[]>([]);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
     const loadData = useCallback(async () => {
+        if (!user) return;
         const [analysesData, chatsData, editsData] = await Promise.all([
-            getArchivedAnalyses(), 
-            getArchivedChats(),
-            getArchivedRecordEdits()
+            getArchivedAnalyses(user.email), 
+            getArchivedChats(user.email),
+            getArchivedRecordEdits(user.email)
         ]);
         setAnalyses(analysesData);
         setChats(chatsData);
         setEdits(editsData);
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         loadData();
@@ -138,7 +143,7 @@ const Archive: React.FC = () => {
                                 <div className={`p-3 rounded-lg max-w-lg ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'}`}>
                                 <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }}/>
                                 </div>
-                                {msg.role === 'user' && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center text-white"><User size={20} /></div>}
+                                {msg.role === 'user' && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center text-white"><UserIcon size={20} /></div>}
                             </div>
                         ))}
                     </div>
