@@ -28,3 +28,12 @@ export const loadRecords = (userEmail: string): HealthRecord[] => {
     return [];
   }
 };
+
+export const deleteRecords = (userEmail: string): void => {
+    if (!userEmail) return;
+    try {
+        localStorage.removeItem(getStorageKey(userEmail));
+    } catch (error) {
+        console.error("Could not delete records from local storage", error);
+    }
+}

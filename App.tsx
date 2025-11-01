@@ -11,6 +11,7 @@ import LabResultsList from './components/LabResultsList';
 import Archive from './components/Archive';
 import EditRecordModal from './components/EditRecordModal';
 import Auth from './components/Auth';
+import AdminPanel from './components/AdminPanel';
 import { LogOut } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -167,6 +168,8 @@ const App: React.FC = () => {
         return <Chatbot user={currentUser!} />;
       case Tab.Archive:
         return <Archive user={currentUser!} />;
+      case Tab.Admin:
+        return currentUser?.role === 'admin' ? <AdminPanel currentUser={currentUser} /> : null;
       default:
         return null;
     }
@@ -200,11 +203,12 @@ const App: React.FC = () => {
           <h1 className="text-xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
             DiaCompanion
           </h1>
-          <nav className="grid grid-cols-2 gap-2 w-full max-w-md md:w-auto md:flex md:space-x-4">
+          <nav className="grid grid-cols-2 md:grid-cols-3 lg:flex gap-2 w-full max-w-lg md:w-auto md:flex md:space-x-4">
             <TabButton tab={Tab.Diary} label="Дневник" />
             <TabButton tab={Tab.Analytics} label="Аналитика" />
             <TabButton tab={Tab.Chat} label="Чат-ассистент" />
             <TabButton tab={Tab.Archive} label="Архив" />
+            {currentUser.role === 'admin' && <TabButton tab={Tab.Admin} label="Админ-панель" />}
           </nav>
            <div className="flex items-center space-x-2">
             <span className="text-sm text-slate-500 dark:text-slate-400 hidden lg:block">{currentUser.email}</span>

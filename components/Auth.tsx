@@ -31,7 +31,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           setError('Неверный email или пароль.');
         }
       } else {
-        const newUser: User = { email, password };
+        // FIX: The `addUser` function assigns a default role. The explicit `User` type annotation
+        // was removed to match the `Omit<User, 'role'>` type expected by `addUser`.
+        const newUser = { email, password };
         await addUser(newUser);
         alert('Регистрация прошла успешно! Теперь вы можете войти.');
         setIsLogin(true); // Switch to login form after registration

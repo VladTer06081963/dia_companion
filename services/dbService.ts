@@ -1,7 +1,8 @@
 import { LabResult, ArchivedAnalysis, ArchivedChat, ArchivedRecordEdit, User } from '../types';
+import { deleteRecords as deleteLocalRecords } from './storageService';
 
 const DB_NAME = 'DiaCompanionDB';
-const DB_VERSION = 4; // Incremented version for schema change
+const DB_VERSION = 5; // Incremented version for schema change
 const USERS_STORE_NAME = 'users';
 const LAB_STORE_NAME = 'labResults';
 const ANALYSIS_STORE_NAME = 'archivedAnalyses';
@@ -25,6 +26,16 @@ export const initDB = (): Promise<boolean> => {
 
     request.onsuccess = (event) => {
       db = request.result;
+       // Create a default admin user if one doesn't exist
+      const transaction = db.transaction(USERS_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(USERS_STORE_NAME);
+      const adminEmail = 'admin@diacompanion.com';
+      const getRequest = store.get(adminEmail);
+      getRequest.onsuccess = () => {
+        if (!getRequest.result) {
+          store.add({ email: adminEmail, password: 'admin123', role: 'admin' });
+        }
+      };
       resolve(true);
     };
 
@@ -32,7 +43,7 @@ export const initDB = (): Promise<boolean> => {
       const db = (event.target as IDBOpenDBRequest).result;
       const transaction = (event.target as IDBOpenDBRequest).transaction;
 
-      if (event.oldVersion < 4) {
+      if (event.oldVersion < 4) { // Migrations from versions before user system
         if (!db.objectStoreNames.contains(USERS_STORE_NAME)) {
             db.createObjectStore(USERS_STORE_NAME, { keyPath: 'email' });
         }
@@ -46,6 +57,8 @@ export const initDB = (): Promise<boolean> => {
             }
         });
       }
+      
+      // Version 5 doesn't need schema changes, only data seeding, handled in onsuccess.
 
       // Initial stores creation for a fresh DB
       if (!db.objectStoreNames.contains(LAB_STORE_NAME)) {
@@ -69,7 +82,7 @@ export const initDB = (): Promise<boolean> => {
 };
 
 // --- User Management ---
-export const addUser = (user: User): Promise<void> => {
+export const addUser = (user: Omit<User, 'role'>): Promise<void> => {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([USERS_STORE_NAME], 'readwrite');
     const store = transaction.objectStore(USERS_STORE_NAME);
@@ -78,7 +91,8 @@ export const addUser = (user: User): Promise<void> => {
         if(getRequest.result) {
             reject(new Error('Пользователь с таким email уже существует.'));
         } else {
-            const addRequest = store.add(user);
+            const newUser: User = {...user, role: 'user'};
+            const addRequest = store.add(newUser);
             addRequest.onsuccess = () => resolve();
             addRequest.onerror = () => reject(addRequest.error);
         }
@@ -101,6 +115,52 @@ export const getUser = (email: string, password: string):Promise<User | null> =>
             }
         };
         request.onerror = () => reject(request.error);
+    });
+}
+
+export const getAllUsers = (): Promise<User[]> => {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([USERS_STORE_NAME], 'readonly');
+        const store = transaction.objectStore(USERS_STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export const deleteUserAndData = (userEmail: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const allStores = [
+            USERS_STORE_NAME,
+            LAB_STORE_NAME,
+            ANALYSIS_STORE_NAME,
+            CHAT_STORE_NAME,
+            EDIT_HISTORY_STORE_NAME,
+        ];
+        const transaction = db.transaction(allStores, 'readwrite');
+        transaction.onerror = (event) => reject(transaction.error);
+        transaction.oncomplete = () => {
+            deleteLocalRecords(userEmail); // Also clear localStorage
+            resolve();
+        };
+
+        // 1. Delete user from users store
+        transaction.objectStore(USERS_STORE_NAME).delete(userEmail);
+
+        // 2. Delete data from other stores
+        const storesWithUserData = [LAB_STORE_NAME, ANALYSIS_STORE_NAME, CHAT_STORE_NAME, EDIT_HISTORY_STORE_NAME];
+        storesWithUserData.forEach(storeName => {
+            const store = transaction.objectStore(storeName);
+            const index = store.index('byUserEmail');
+            const request = index.openKeyCursor(IDBKeyRange.only(userEmail));
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (cursor) {
+                    store.delete(cursor.primaryKey);
+                    cursor.continue();
+                }
+            }
+        });
     });
 }
 

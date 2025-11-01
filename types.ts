@@ -12,6 +12,7 @@ export enum Tab {
   Analytics = 'analytics',
   Chat = 'chat',
   Archive = 'archive',
+  Admin = 'admin',
 }
 
 export interface ChatMessage {
@@ -59,4 +60,5 @@ export interface User {
   email: string;
   // In a real app, this would be a hashed password
   password: string;
+  role: 'user' | 'admin';
 }
