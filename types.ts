@@ -1,4 +1,3 @@
-
 export interface HealthRecord {
   id: string;
   datetime: string;
@@ -12,9 +11,34 @@ export enum Tab {
   Diary = 'diary',
   Analytics = 'analytics',
   Chat = 'chat',
+  Archive = 'archive',
 }
 
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+}
+
+export interface LabResult {
+  id: string;
+  datetime: string;
+  type: 'blood' | 'urine' | 'other';
+  fileName: string;
+  fileType: string;
+  fileContent: string; // base64 encoded
+}
+
+export interface ArchivedAnalysis {
+    id: string;
+    datetime: string;
+    analysis: {
+        text: string;
+        sources: any[];
+    };
+}
+
+export interface ArchivedChat {
+    id: string;
+    datetime: string;
+    messages: ChatMessage[];
 }

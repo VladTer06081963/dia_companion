@@ -1,16 +1,17 @@
-
 import React, { useState, useMemo } from 'react';
-import { HealthRecord } from '../types';
+import { HealthRecord, LabResult } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { analyzeHealthDataWithSearch, playAudio, getTextToSpeech } from '../services/geminiService';
+import { addArchivedAnalysis } from '../services/dbService';
 import ImageAnalyzer from './ImageAnalyzer';
 import { Loader2, Volume2, FileText } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
   records: HealthRecord[];
+  labResults: LabResult[];
 }
 
-const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records }) => {
+const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records, labResults }) => {
   const [analysis, setAnalysis] = useState<{text: string; sources: any[]}|null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -25,15 +26,22 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records }) => {
   }, [records]);
 
   const handleAnalyze = async () => {
-    if (records.length < 3) {
-      alert("Нужно как минимум 3 записи для анализа.");
+    if (records.length < 3 && labResults.length === 0) {
+      alert("Нужно как минимум 3 записи в дневнике или один загруженный анализ.");
       return;
     }
     setIsLoading(true);
     setAnalysis(null);
     try {
-      const result = await analyzeHealthDataWithSearch(records);
+      const result = await analyzeHealthDataWithSearch(records, labResults);
       setAnalysis(result);
+      // Automatically archive the analysis
+      await addArchivedAnalysis({
+        id: Date.now().toString(),
+        datetime: new Date().toISOString(),
+        analysis: result,
+      });
+      alert('Анализ сгенерирован и сохранен в архив.');
     } catch (error) {
       console.error("Analysis failed:", error);
       alert("Не удалось выполнить анализ. Попробуйте позже.");
@@ -103,7 +111,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ records }) => {
             <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">AI-Анализ и Рекомендации</h2>
             <button
               onClick={handleAnalyze}
-              disabled={isLoading || records.length < 3}
+              disabled={isLoading || (records.length < 3 && labResults.length === 0)}
               className="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-transform duration-150 active:scale-95 shadow-md disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isLoading ? <Loader2 className="animate-spin mr-2" /> : <FileText className="mr-2" />}

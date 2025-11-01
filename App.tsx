@@ -1,18 +1,32 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { HealthRecord, Tab } from './types';
+import { HealthRecord, LabResult, Tab } from './types';
 import { loadRecords, saveRecords } from './services/storageService';
+import { initDB, getLabResults, addLabResult, deleteLabResult } from './services/dbService';
 import HealthForm from './components/HealthForm';
 import HistoryTable from './components/HistoryTable';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import Chatbot from './components/Chatbot';
+import LabUpload from './components/LabUpload';
+import LabResultsList from './components/LabResultsList';
+import Archive from './components/Archive';
 
 const App: React.FC = () => {
   const [records, setRecords] = useState<HealthRecord[]>([]);
+  const [labResults, setLabResults] = useState<LabResult[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Diary);
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    setRecords(loadRecords());
+    const initialize = async () => {
+      setRecords(loadRecords());
+      const isDbReady = await initDB();
+      if (isDbReady) {
+        setDbReady(true);
+        const results = await getLabResults();
+        setLabResults(results);
+      }
+    };
+    initialize();
   }, []);
 
   const handleAddRecord = useCallback((record: Omit<HealthRecord, 'id'>) => {
@@ -57,6 +71,22 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleAddLabResult = useCallback(async (result: Omit<LabResult, 'id'>) => {
+    if (!dbReady) return;
+    const newResult: LabResult = { ...result, id: Date.now().toString() };
+    await addLabResult(newResult);
+    const updatedResults = await getLabResults();
+    setLabResults(updatedResults);
+    alert('Анализ успешно загружен.');
+  }, [dbReady]);
+
+  const handleDeleteLabResult = useCallback(async (id: string) => {
+    if (!dbReady) return;
+    await deleteLabResult(id);
+    const updatedResults = await getLabResults();
+    setLabResults(updatedResults);
+  }, [dbReady]);
+
   const renderContent = () => {
     switch (activeTab) {
       case Tab.Diary:
@@ -64,16 +94,20 @@ const App: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
               <HealthForm onAddRecord={handleAddRecord} />
+              <LabUpload onAddLabResult={handleAddLabResult} />
             </div>
             <div className="lg:col-span-2">
               <HistoryTable records={records} onDeleteRecord={handleDeleteRecord} onImportRecords={handleImportRecords} />
+              <LabResultsList labResults={labResults} onDeleteLabResult={handleDeleteLabResult} />
             </div>
           </div>
         );
       case Tab.Analytics:
-        return <AnalyticsDashboard records={records} />;
+        return <AnalyticsDashboard records={records} labResults={labResults} />;
       case Tab.Chat:
         return <Chatbot />;
+      case Tab.Archive:
+        return <Archive />;
       default:
         return null;
     }
@@ -103,6 +137,7 @@ const App: React.FC = () => {
             <TabButton tab={Tab.Diary} label="Дневник" />
             <TabButton tab={Tab.Analytics} label="Аналитика" />
             <TabButton tab={Tab.Chat} label="Чат-ассистент" />
+            <TabButton tab={Tab.Archive} label="Архив" />
           </nav>
         </div>
       </header>

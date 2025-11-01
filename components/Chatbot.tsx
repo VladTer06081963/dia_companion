@@ -1,13 +1,16 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { getChatResponse } from '../services/geminiService';
+import { addArchivedChat } from '../services/dbService';
 import { ChatMessage } from '../types';
-import { Send, User, Bot, Loader2 } from 'lucide-react';
+import { Send, User, Bot, Loader2, Save } from 'lucide-react';
+
+const initialMessage: ChatMessage = { 
+    role: 'model', 
+    text: 'Здравствуйте! Я ваш AI-ассистент по вопросам диабета. Чем могу помочь? Вы можете задать вопросы о питании, физических нагрузках или общие вопросы о диабете.' 
+};
 
 const Chatbot: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: 'Здравствуйте! Я ваш AI-ассистент по вопросам диабета. Чем могу помочь? Вы можете задать вопросы о питании, физических нагрузках или общие вопросы о диабете.' }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -43,11 +46,39 @@ const Chatbot: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  const handleSaveChat = async () => {
+    if (messages.length <= 1) {
+        alert('Нет сообщений для сохранения.');
+        return;
+    }
+    try {
+        await addArchivedChat({
+            id: Date.now().toString(),
+            datetime: new Date().toISOString(),
+            messages,
+        });
+        alert('Чат сохранен в архив.');
+        setMessages([initialMessage]);
+    } catch (error) {
+        console.error('Failed to save chat:', error);
+        alert('Не удалось сохранить чат.');
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg flex flex-col h-[80vh] max-h-[700px]">
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
         <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Чат-ассистент</h2>
+        <button
+            onClick={handleSaveChat}
+            disabled={isLoading || messages.length <= 1}
+            className="flex items-center space-x-2 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+            aria-label="Сохранить и очистить чат"
+        >
+            <Save size={16} />
+            <span>Сохранить и очистить чат</span>
+        </button>
       </div>
       <div className="flex-1 p-4 overflow-y-auto space-y-4">
         {messages.map((msg, index) => (
