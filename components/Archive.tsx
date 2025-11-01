@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArchivedAnalysis, ArchivedChat, ChatMessage } from '../types';
-import { getArchivedAnalyses, deleteArchivedAnalysis, getArchivedChats, deleteArchivedChat } from '../services/dbService';
-import { ChevronDown, ChevronUp, Trash2, Bot, User, FileText, MessageSquare } from 'lucide-react';
+import { ArchivedAnalysis, ArchivedChat, ArchivedRecordEdit, HealthRecord } from '../types';
+import { getArchivedAnalyses, deleteArchivedAnalysis, getArchivedChats, deleteArchivedChat, getArchivedRecordEdits, deleteArchivedRecordEdit } from '../services/dbService';
+import { ChevronDown, ChevronUp, Trash2, Bot, User, FileText, MessageSquare, History } from 'lucide-react';
 
 const Archive: React.FC = () => {
     const [analyses, setAnalyses] = useState<ArchivedAnalysis[]>([]);
     const [chats, setChats] = useState<ArchivedChat[]>([]);
+    const [edits, setEdits] = useState<ArchivedRecordEdit[]>([]);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
     const loadData = useCallback(async () => {
-        const [analysesData, chatsData] = await Promise.all([getArchivedAnalyses(), getArchivedChats()]);
+        const [analysesData, chatsData, editsData] = await Promise.all([
+            getArchivedAnalyses(), 
+            getArchivedChats(),
+            getArchivedRecordEdits()
+        ]);
         setAnalyses(analysesData);
         setChats(chatsData);
+        setEdits(editsData);
     }, []);
 
     useEffect(() => {
@@ -32,6 +38,13 @@ const Archive: React.FC = () => {
         }
     };
     
+    const handleDeleteEdit = async (id: string) => {
+        if (window.confirm('Вы уверены, что хотите удалить эту запись из истории?')) {
+            await deleteArchivedRecordEdit(id);
+            loadData();
+        }
+    };
+
     const toggleExpand = (id: string) => {
         setExpandedItems(prev => ({...prev, [id]: !prev[id]}));
     };
@@ -45,6 +58,9 @@ const Archive: React.FC = () => {
             minute: '2-digit'
         });
     };
+    
+    const renderValue = (value?: number, unit?: string) => value !== undefined ? `${value}${unit || ''}` : '—';
+    const renderPressure = (record: HealthRecord) => (record.systolic !== undefined && record.diastolic !== undefined) ? `${record.systolic}/${record.diastolic}` : '—';
 
     const AnalysisItem: React.FC<{item: ArchivedAnalysis}> = ({item}) => {
         const isExpanded = expandedItems[item.id];
@@ -129,29 +145,86 @@ const Archive: React.FC = () => {
                 )}
             </li>
         )
-    }
+    };
+
+    const EditHistoryItem: React.FC<{item: ArchivedRecordEdit}> = ({ item }) => {
+        const isExpanded = expandedItems[item.id];
+        return (
+            <li className="bg-slate-50 dark:bg-slate-800/50 rounded-lg shadow-sm transition-all duration-300">
+                <div 
+                    className="flex items-center justify-between p-4 cursor-pointer"
+                    onClick={() => toggleExpand(item.id)}
+                >
+                    <div className="flex items-center space-x-3 overflow-hidden">
+                        <History className="text-purple-500 flex-shrink-0" size={24} />
+                        <div>
+                            <p className="font-semibold text-slate-800 dark:text-slate-100">Запись изменена</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{formatDateTime(item.datetime)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteEdit(item.id) }} className="text-red-500 hover:text-red-700 transition-colors">
+                            <Trash2 size={18} />
+                        </button>
+                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                </div>
+                {isExpanded && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 text-sm">
+                        <p className="mb-2 text-slate-600 dark:text-slate-300">Исходная запись от: <span className="font-medium">{formatDateTime(item.originalRecord.datetime)}</span></p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
+                                <h4 className="font-bold mb-2 text-red-700 dark:text-red-400">Было</h4>
+                                <p><strong>Глюкоза:</strong> {renderValue(item.originalRecord.glucose, ' ммоль/л')}</p>
+                                <p><strong>Давление:</strong> {renderPressure(item.originalRecord)}</p>
+                                <p className="mt-1 italic text-xs truncate"><strong>Комм:</strong> {item.originalRecord.comment || '—'}</p>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+                                <h4 className="font-bold mb-2 text-green-700 dark:text-green-400">Стало</h4>
+                                <p><strong>Глюкоза:</strong> {renderValue(item.updatedRecord.glucose, ' ммоль/л')}</p>
+                                <p><strong>Давление:</strong> {renderPressure(item.updatedRecord)}</p>
+                                <p className="mt-1 italic text-xs truncate"><strong>Комм:</strong> {item.updatedRecord.comment || '—'}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </li>
+        );
+    };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-8">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
-                <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Архив анализов</h2>
-                {analyses.length > 0 ? (
+                <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">История изменений записей</h2>
+                 {edits.length > 0 ? (
                     <ul className="space-y-4">
-                        {analyses.map(item => <AnalysisItem key={item.id} item={item} />)}
+                        {edits.map(item => <EditHistoryItem key={item.id} item={item} />)}
                     </ul>
                 ) : (
-                    <p className="text-center text-slate-500 dark:text-slate-400 py-8">Нет сохраненных анализов.</p>
+                    <p className="text-center text-slate-500 dark:text-slate-400 py-8">Нет записей об изменениях.</p>
                 )}
             </div>
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
-                <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Архив чатов</h2>
-                {chats.length > 0 ? (
-                     <ul className="space-y-4">
-                        {chats.map(item => <ChatItem key={item.id} item={item} />)}
-                    </ul>
-                ) : (
-                    <p className="text-center text-slate-500 dark:text-slate-400 py-8">Нет сохраненных чатов.</p>
-                )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+                    <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Архив анализов</h2>
+                    {analyses.length > 0 ? (
+                        <ul className="space-y-4">
+                            {analyses.map(item => <AnalysisItem key={item.id} item={item} />)}
+                        </ul>
+                    ) : (
+                        <p className="text-center text-slate-500 dark:text-slate-400 py-8">Нет сохраненных анализов.</p>
+                    )}
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
+                    <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Архив чатов</h2>
+                    {chats.length > 0 ? (
+                         <ul className="space-y-4">
+                            {chats.map(item => <ChatItem key={item.id} item={item} />)}
+                        </ul>
+                    ) : (
+                        <p className="text-center text-slate-500 dark:text-slate-400 py-8">Нет сохраненных чатов.</p>
+                    )}
+                </div>
             </div>
         </div>
     );

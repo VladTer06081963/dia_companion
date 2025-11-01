@@ -1,10 +1,11 @@
-import { LabResult, ArchivedAnalysis, ArchivedChat } from '../types';
+import { LabResult, ArchivedAnalysis, ArchivedChat, ArchivedRecordEdit, HealthRecord } from '../types';
 
 const DB_NAME = 'DiaCompanionDB';
-const DB_VERSION = 2; // Incremented version for schema change
+const DB_VERSION = 3; // Incremented version for schema change
 const LAB_STORE_NAME = 'labResults';
 const ANALYSIS_STORE_NAME = 'archivedAnalyses';
 const CHAT_STORE_NAME = 'archivedChats';
+const EDIT_HISTORY_STORE_NAME = 'recordEdits';
 
 
 let db: IDBDatabase;
@@ -36,6 +37,9 @@ export const initDB = (): Promise<boolean> => {
       }
        if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
         db.createObjectStore(CHAT_STORE_NAME, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(EDIT_HISTORY_STORE_NAME)) {
+        db.createObjectStore(EDIT_HISTORY_STORE_NAME, { keyPath: 'id' });
       }
     };
   });
@@ -158,6 +162,42 @@ export const deleteArchivedChat = (id: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CHAT_STORE_NAME], 'readwrite');
     const store = transaction.objectStore(CHAT_STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// --- Record Edit History ---
+
+export const addArchivedRecordEdit = (edit: ArchivedRecordEdit): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([EDIT_HISTORY_STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(EDIT_HISTORY_STORE_NAME);
+    const request = store.add(edit);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getArchivedRecordEdits = (): Promise<ArchivedRecordEdit[]> => {
+  return new Promise((resolve, reject) => {
+    if (!db) return resolve([]);
+    const transaction = db.transaction([EDIT_HISTORY_STORE_NAME], 'readonly');
+    const store = transaction.objectStore(EDIT_HISTORY_STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const results = request.result.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
+      resolve(results);
+    };
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteArchivedRecordEdit = (id: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([EDIT_HISTORY_STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(EDIT_HISTORY_STORE_NAME);
     const request = store.delete(id);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);

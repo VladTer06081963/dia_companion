@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HealthRecord, LabResult, Tab } from './types';
 import { loadRecords, saveRecords } from './services/storageService';
-import { initDB, getLabResults, addLabResult, deleteLabResult } from './services/dbService';
+import { initDB, getLabResults, addLabResult, deleteLabResult, addArchivedRecordEdit } from './services/dbService';
 import HealthForm from './components/HealthForm';
 import HistoryTable from './components/HistoryTable';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
@@ -9,12 +9,14 @@ import Chatbot from './components/Chatbot';
 import LabUpload from './components/LabUpload';
 import LabResultsList from './components/LabResultsList';
 import Archive from './components/Archive';
+import EditRecordModal from './components/EditRecordModal';
 
 const App: React.FC = () => {
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [labResults, setLabResults] = useState<LabResult[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>(Tab.Diary);
   const [dbReady, setDbReady] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<HealthRecord | null>(null);
 
   useEffect(() => {
     const initialize = async () => {
@@ -37,6 +39,37 @@ const App: React.FC = () => {
       return updatedRecords;
     });
   }, []);
+  
+  const handleEditRecord = useCallback((id: string) => {
+    const recordToEdit = records.find(r => r.id === id);
+    if (recordToEdit) {
+      setEditingRecord(recordToEdit);
+    }
+  }, [records]);
+
+  const handleUpdateRecord = useCallback(async (updatedRecord: HealthRecord) => {
+    const originalRecord = records.find(r => r.id === updatedRecord.id);
+    if (!originalRecord) return;
+
+    // Archive the change
+    await addArchivedRecordEdit({
+      id: Date.now().toString(),
+      datetime: new Date().toISOString(),
+      recordId: originalRecord.id,
+      originalRecord,
+      updatedRecord,
+    });
+
+    setRecords(prevRecords => {
+      const updatedRecords = prevRecords.map(r => r.id === updatedRecord.id ? updatedRecord : r)
+        .sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
+      saveRecords(updatedRecords);
+      return updatedRecords;
+    });
+
+    setEditingRecord(null);
+  }, [records]);
+
 
   const handleDeleteRecord = useCallback((id: string) => {
     setRecords(prevRecords => {
@@ -97,7 +130,7 @@ const App: React.FC = () => {
               <LabUpload onAddLabResult={handleAddLabResult} />
             </div>
             <div className="lg:col-span-2">
-              <HistoryTable records={records} onDeleteRecord={handleDeleteRecord} onImportRecords={handleImportRecords} />
+              <HistoryTable records={records} onDeleteRecord={handleDeleteRecord} onImportRecords={handleImportRecords} onEditRecord={handleEditRecord} />
               <LabResultsList labResults={labResults} onDeleteLabResult={handleDeleteLabResult} />
             </div>
           </div>
@@ -147,6 +180,13 @@ const App: React.FC = () => {
       <footer className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">
         <p>Это приложение не является медицинским устройством. Всегда консультируйтесь с врачом.</p>
       </footer>
+      {editingRecord && (
+        <EditRecordModal
+          record={editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSave={handleUpdateRecord}
+        />
+      )}
     </div>
   );
 };

@@ -42,3 +42,11 @@ export interface ArchivedChat {
     datetime: string;
     messages: ChatMessage[];
 }
+
+export interface ArchivedRecordEdit {
+  id: string; // Unique ID for the edit itself
+  datetime: string; // When the edit was made
+  recordId: string; // ID of the original record
+  originalRecord: HealthRecord;
+  updatedRecord: HealthRecord;
+}

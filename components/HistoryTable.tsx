@@ -1,17 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { HealthRecord } from '../types';
-import { Trash2, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Download, Upload, Pencil } from 'lucide-react';
 
 interface HistoryTableProps {
   records: HealthRecord[];
   onDeleteRecord: (id: string) => void;
   onImportRecords: (records: Omit<HealthRecord, 'id'>[]) => void;
+  onEditRecord: (id: string) => void;
 }
 
 const RECORDS_PER_PAGE = 10;
 
-const HistoryTable: React.FC<HistoryTableProps> = ({ records, onDeleteRecord, onImportRecords }) => {
+const HistoryTable: React.FC<HistoryTableProps> = ({ records, onDeleteRecord, onImportRecords, onEditRecord }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -281,9 +282,14 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ records, onDeleteRecord, on
                     <td className={`px-4 py-3 ${getPressureClass(record.systolic, record.diastolic)}`}>{record.systolic !== undefined && record.diastolic !== undefined ? `${record.systolic}/${record.diastolic}` : '—'}</td>
                     <td className="px-4 py-3 max-w-xs truncate">{record.comment}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => onDeleteRecord(record.id)} className="text-red-500 hover:text-red-700 transition-colors" aria-label={`Удалить запись от ${formatDateTime(record.datetime)}`}>
-                        <Trash2 size={18} />
-                      </button>
+                      <div className="flex items-center space-x-3">
+                        <button onClick={() => onEditRecord(record.id)} className="text-blue-500 hover:text-blue-700 transition-colors" aria-label={`Редактировать запись от ${formatDateTime(record.datetime)}`}>
+                          <Pencil size={18} />
+                        </button>
+                        <button onClick={() => onDeleteRecord(record.id)} className="text-red-500 hover:text-red-700 transition-colors" aria-label={`Удалить запись от ${formatDateTime(record.datetime)}`}>
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
